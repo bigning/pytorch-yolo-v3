@@ -1,5 +1,6 @@
 import os,sys
 import torch.nn
+import darknet_util
 
 class EmptyLayer(torch.nn.Module):
     def __init__(self):
@@ -93,10 +94,19 @@ def createUpsampleModule(module_dict, index, prev_channels):
     module.add_module('upsample_{}'.format(index), upsample)
     return prev_channels, module
 
-def createYoloModule():
+def createYoloModule(module_dict, index, original_img_size, use_cuda):
+    mask = module_dict['mask']
+    mask = mask.strip(' ').split(',')
+    mask = [int(i) for i in mask]
+    anchors = module_dict['anchors'].strip(' ').split(', ')
+    anchors = [anchors[i] for i in mask]
+    anchors = [[int(j) for j in i.strip(' ').split(',')] for i in anchors]
+    #print(anchors)
+    module = torch.nn.Sequential()
+    yolo = darknet_util.YoloLayer(original_img_size, anchors, use_cuda)
+    module.add_module('yolo_{}'.format(index), yolo)
 
-
-def createModules(modules_list):
+def createModules(modules_list, use_cuda):
     net_info = modules_list[0]
 
     torch_module_list = torch.nn.ModuleList()
@@ -121,8 +131,9 @@ def createModules(modules_list):
                                                            index,
                                                            prev_channels)
         elif module_dict['type'] == 'yolo':
-            output_filter = prev_channels
-            module = EmptyLayer()
+            output_filter = -1 
+            original_img_size = [int(net_info['height']), int(net_info['width'])]
+            module = createYoloModule(module_dict, index, original_img_size, use_cuda)
         else:
             print('failed to create nn.module for type: {}'
                   .format(module_dict['type']))
@@ -134,5 +145,6 @@ def createModules(modules_list):
 
 if __name__=='__main__':
     modules_list = parseCfg('./yolov3.cfg')
-    modules = createModules(modules_list) 
+    use_cuda = torch.cuda.is_available()
+    modules = createModules(modules_list, use_cuda)
     #print('hello world')
