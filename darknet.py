@@ -93,7 +93,7 @@ def createUpsampleModule(module_dict, index, prev_channels):
     module.add_module('upsample_{}'.format(index), upsample)
     return prev_channels, module
 
-def createYoloModule()
+def createYoloModule():
 
 
 def createModules(modules_list):
