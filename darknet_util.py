@@ -19,7 +19,7 @@ class YoloLayer(torch.nn.Module):
         input_cols = input_dim[3]
         num_anchors = len(self.anchors)
 
-        stride = float(original_img_size[0]) / float(input_rows)
+        stride = float(self.original_img_size[0]) / float(input_rows)
 
         # 5 = 4 + 1, 4 is the (x, y, w, h), 1 is the objectness score
         classes = channels / len(self.anchors) - 5
@@ -38,10 +38,10 @@ class YoloLayer(torch.nn.Module):
         # by = sigmoid(ty) +cy
         # bw = pw * exp(tw)
         # bh = ph * exp(th)
-        cx = torch.tensor([i for i in range(input_cols) for j in range(num_anchors)]).repeat(input_rows)
-        cy = torch.tensor([i for i in range(input_rows) for j in range(input_cols*num_anchors)])
-        pw = torch.tensor([box[0] for box in self.anchors]).repeat(input_rows*input_cols)
-        ph = torch.tensor([box[1] for box in self.anchors]).repeat(input_rows*input_cols)
+        cx = torch.tensor([i for i in range(input_cols) for j in range(num_anchors)]).repeat(input_rows).to(torch.float)
+        cy = torch.tensor([i for i in range(input_rows) for j in range(input_cols*num_anchors)]).to(torch.float)
+        pw = torch.tensor([box[0] for box in self.anchors]).repeat(input_rows*input_cols).to(torch.float)
+        ph = torch.tensor([box[1] for box in self.anchors]).repeat(input_rows*input_cols).to(torch.float)
 
         if self.use_cuda:
             cx.cuda()
@@ -56,4 +56,5 @@ class YoloLayer(torch.nn.Module):
         # objectness and classes score
         x[:, :, 4:] = torch.sigmoid(x[:, :, 4:])
         
+        # batch, rows*cols*num_anchors, num_box_attr
         return x
