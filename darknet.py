@@ -45,7 +45,7 @@ def createConvModule(module_dict, index, prev_channels):
         conv_bias = True 
         has_bn = False
     if int(module_dict['pad']) == 1:
-        padding = (int(module_dict['size']) - 1) / 2
+        padding = int((int(module_dict['size']) - 1) / 2)
 
     filters = int(module_dict['filters'])
 
@@ -90,12 +90,10 @@ def createRouteModule(module_dict, index, output_filters):
 
 def createUpsampleModule(module_dict, index, prev_channels):
     module = torch.nn.Sequential()
-    scale_factor = int(module_dict['stride'])
-    upsample = torch.nn.Upsample(scale_factor=scale_factor, mode='bilinear')
-    module.add_module('upsample_{}'.format(index), upsample)
+    module.add_module('upsample_{}'.format(index), EmptyLayer())
     return prev_channels, module
 
-def createYoloModule(module_dict, index, original_img_size, use_cuda):
+def createYoloModule(module_dict, index, original_img_size):
     mask = module_dict['mask']
     mask = mask.strip(' ').split(',')
     mask = [int(i) for i in mask]
@@ -104,11 +102,11 @@ def createYoloModule(module_dict, index, original_img_size, use_cuda):
     anchors = [[int(j) for j in i.strip(' ').split(',')] for i in anchors]
     #print(anchors)
     module = torch.nn.Sequential()
-    yolo = darknet_util.YoloLayer(original_img_size, anchors, use_cuda)
+    yolo = darknet_util.YoloLayer(original_img_size, anchors)
     module.add_module('yolo_{}'.format(index), yolo)
     return module
 
-def createModules(modules_list, use_cuda):
+def createModules(modules_list):
     net_info = modules_list[0]
 
     torch_module_list = torch.nn.ModuleList()
@@ -135,7 +133,7 @@ def createModules(modules_list, use_cuda):
         elif module_dict['type'] == 'yolo':
             output_filter = -1 
             original_img_size = [int(net_info['height']), int(net_info['width'])]
-            module = createYoloModule(module_dict, index, original_img_size, use_cuda)
+            module = createYoloModule(module_dict, index, original_img_size)
         else:
             print('failed to create nn.module for type: {}'
                   .format(module_dict['type']))
@@ -149,16 +147,20 @@ class DarknetYoloV3(torch.nn.Module):
     def __init__(self, config_file):
         super(DarknetYoloV3, self).__init__()
         self.module_dict_list = parseCfg('./yolov3.cfg')
-        use_cuda = torch.cuda.is_available()
-        self.net_info, self.module_list = createModules(self.module_dict_list, use_cuda)
+        self.net_info, self.module_list = createModules(self.module_dict_list)
 
     def forward(self, x):
         output = []
         detections = None
         for (index, module_dict) in enumerate(self.module_dict_list[1:]):
             module_type = module_dict['type']
-            if module_type == 'convolutional' or module_type == 'upsample':
+            if module_type == 'convolutional':
                 x = self.module_list[index](x)
+            elif module_type == 'upsample':
+                x = torch.nn.functional.interpolate(x,
+                        scale_factor=int(module_dict['stride']),
+                        mode='bilinear',
+                        align_corners=False)
             elif module_type == 'shortcut':
                 x = output[-1] + output[int(module_dict['from'])]
             elif module_type == 'route':

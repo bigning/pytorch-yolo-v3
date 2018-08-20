@@ -2,14 +2,13 @@ import os,sys
 import torch.nn
 
 class YoloLayer(torch.nn.Module):
-    def __init__(self, original_img_size, anchors, use_cuda):
+    def __init__(self, original_img_size, anchors):
         '''
         original_img_size=[img_rows, img_cols]
         '''
         super(YoloLayer, self).__init__()
         self.original_img_size = original_img_size
         self.anchors = anchors
-        self.use_cuda = use_cuda
 
     def forward(self, x):
         input_dim = x.shape
@@ -43,11 +42,11 @@ class YoloLayer(torch.nn.Module):
         pw = torch.tensor([box[0] for box in self.anchors]).repeat(input_rows*input_cols).to(torch.float)
         ph = torch.tensor([box[1] for box in self.anchors]).repeat(input_rows*input_cols).to(torch.float)
 
-        if self.use_cuda:
-            cx.cuda()
-            cy.cuda()
-            pw.cuda()
-            ph.cuda()
+        if x.is_cuda:
+            cx = cx.cuda()
+            cy = cy.cuda()
+            pw = pw.cuda()
+            ph = ph.cuda()
         x[:, :, 0] = (torch.sigmoid(x[:, :, 0]) + cx) * stride
         x[:, :, 1] = (torch.sigmoid(x[:, :, 1]) + cy) * stride
         x[:, :, 2] = torch.exp(x[:, :, 2]) * pw
