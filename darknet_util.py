@@ -11,6 +11,8 @@ class YoloLayer(torch.nn.Module):
         self.anchors = anchors
 
     def forward(self, x):
+        if self.training:
+            return x
         input_dim = x.shape
         batch_size = input_dim[0]
         channels = input_dim[1]

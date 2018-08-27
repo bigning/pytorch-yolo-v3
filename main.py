@@ -89,6 +89,7 @@ def detect_image(img, yolo_v3, use_cuda):
 if __name__ == '__main__':
     yolo_v3 = darknet.DarknetYoloV3('./yolov3.cfg')
     yolo_v3.load_weight('./data/yolov3.weights')
+    #yolo_v3.load_weight('./data/darknet53.conv.imagenet.74', True)
     use_cuda = torch.cuda.is_available()
     print('use cuda: {}'.format(use_cuda))
     

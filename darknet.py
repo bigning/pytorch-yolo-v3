@@ -152,6 +152,7 @@ class DarknetYoloV3(torch.nn.Module):
     def forward(self, x):
         output = []
         detections = None
+        yolo_training_output = []
         for (index, module_dict) in enumerate(self.module_dict_list[1:]):
             module_type = module_dict['type']
             if module_type == 'convolutional':
@@ -168,17 +169,25 @@ class DarknetYoloV3(torch.nn.Module):
                 layers_arr = [int(i) for i in layers_arr]
                 x = torch.cat([output[i] for i in layers_arr], 1)
             elif module_type == 'yolo':
-                if detections is None:
-                    detections = self.module_list[index](x)
+                # if eval(), yolo layer output the detection result
+                # if train(), yolo layer output the conv result from previous layer
+                if not self.training:
+                    if detections is None:
+                        detections = self.module_list[index](x)
+                    else:
+                        detections = torch.cat((detections, self.module_list[index](x)), 1)
                 else:
-                    detections = torch.cat((detections, self.module_list[index](x)), 1)
+                    yolo_training_output.append(self.module_list[index](x))
                 x = None
             else:
                 print('failed to forward layer: {}'.format(module_type))
             output.append(x)
-        return detections
+        if self.training:
+            return yolo_training_output 
+        else:
+            return detections 
 
-    def load_weight(self, weightfile):
+    def load_weight(self, weightfile, training=False):
 	#Open the weights file
         fp = open(weightfile, "rb")
     
@@ -194,7 +203,11 @@ class DarknetYoloV3(torch.nn.Module):
         weights = np.fromfile(fp, dtype = np.float32)
         
         ptr = 0
-        for i in range(len(self.module_list)):
+        layers = len(self.module_list)
+        if training:
+            ## load imagenet weight
+            layers = 75
+        for i in range(layers):
             module_type = self.module_dict_list[i + 1]["type"]
     
             #If module_type is convolutional load weights
