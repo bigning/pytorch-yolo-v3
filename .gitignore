@@ -1,3 +1,4 @@
 *.pyc
 data/*
 .idea/*
+model_epoch*

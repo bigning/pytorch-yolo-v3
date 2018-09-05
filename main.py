@@ -8,7 +8,7 @@ import time
 import math
 import copy
 
-def detect_image(img, yolo_v3, use_cuda):
+def detect_image(img, yolo_v3, use_cuda, show_img=True, nms=True, obj_threshold=0.5):
     class_name_file = open('coco.names')
     names = class_name_file.readlines()
     class_name_file.close()
@@ -33,7 +33,7 @@ def detect_image(img, yolo_v3, use_cuda):
     # draw result
     stride_x = float(img.shape[1]) / float(img_size)
     stride_y = float(img.shape[0]) / float(img_size)
-    objectness_threshold = 0.5
+    objectness_threshold = obj_threshold
     detection = detection[0,:,:]
     bboxes = {}
     scores = {}
@@ -67,7 +67,10 @@ def detect_image(img, yolo_v3, use_cuda):
                 all_indices[class_name] = [i]
                 class_indices[class_name] = [class_index]
     for class_name in bboxes:
-        indices = cv2.dnn.NMSBoxes(bboxes[class_name], scores[class_name], objectness_threshold, nms_threshold)
+        if nms:
+            indices = cv2.dnn.NMSBoxes(bboxes[class_name], scores[class_name], objectness_threshold, nms_threshold)
+        else:
+            indices = range(len(bboxes[class_name]))
         for ii in indices:
             i = int(ii)
             x = bboxes[class_name][i][0]
@@ -81,14 +84,21 @@ def detect_image(img, yolo_v3, use_cuda):
             index = all_indices[class_name][i]
             class_index = class_indices[class_name][i]
             prob = detection[index, 5:][class_index]
+            #print(detection[index, 5:])
             text = class_name + ': {}'.format(prob)
             cv2.putText(img, text, (x,y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-    cv2.imshow("a", img)
-    cv2.waitKey()
+    if show_img:
+        cv2.imshow("a", img)
+        cv2.waitKey()
+    return img
 
 if __name__ == '__main__':
     yolo_v3 = darknet.DarknetYoloV3('./yolov3.cfg')
-    yolo_v3.load_weight('./data/yolov3.weights')
+    
+    check_point = torch.load('./model_epoch_20')
+    yolo_v3.load_state_dict(check_point['model'])
+    
+    #yolo_v3.load_weight('./data/yolov3.weights')
     #yolo_v3.load_weight('./data/darknet53.conv.imagenet.74', True)
     use_cuda = torch.cuda.is_available()
     print('use cuda: {}'.format(use_cuda))
@@ -97,7 +107,7 @@ if __name__ == '__main__':
         yolo_v3.cuda()
     yolo_v3.eval()
     print('model is ready')
-    img = cv2.imread('./data/images/7f17d07dcc75de3a.jpg')
-    #img = cv2.imread('./data/images/7f1df70e39bdc456.jpg')
+    #img = cv2.imread('./data/images/7f17d07dcc75de3a.jpg')
+    img = cv2.imread('./data/images/7f1c4dee402c50de.jpg')
 
-    detect_image(img, yolo_v3, use_cuda)
+    detect_image(img, yolo_v3, use_cuda, obj_threshold=0.3)
